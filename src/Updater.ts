@@ -86,6 +86,7 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
      */
     async checkForUpdates(): Promise<UpdateInfo | null> {
         try {
+            this.emit("checking-for-update");
             this.config.logger.info("Checking for updates...");
             if (this.debug) this.sendDebugLog("[Updater:debug] Calling getLatestRelease...");
             const info = await this.githubProvider.getLatestRelease();
@@ -94,7 +95,8 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
                 this.sendDebugLog("[Updater:debug] Current version:", this.currentVersion);
             }
             this.lastUpdateInfo = info;
-            if (info && semver.valid(info.version) && semver.gt(info.version, this.currentVersion)) {
+            if (info && semver.valid(info.version) && semver.valid(this.currentVersion) && 
+                semver.gt(info.version, this.currentVersion)) {
                 if (this.debug) this.sendDebugLog("[Updater:debug] Update available:", info.version);
                 this.emit("update-available", info);
                 this.config.logger.info("Update available:", info.version);
@@ -136,10 +138,18 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
         // Select asset for current platform
         const asset = this.lastUpdateInfo.assets.find((a) => {
             const n = a.name.toLowerCase();
-            if (platform === "win32") return n.endsWith(".exe") || n.endsWith(".nsis.zip");
-            if (platform === "darwin") return n.endsWith(".dmg") || n.endsWith(".zip");
-            if (platform === "linux")
-                return n.endsWith(".AppImage") || n.endsWith(".tar.gz") || n.endsWith(".deb") || n.endsWith(".rpm");
+            if (platform === "win32") {
+                return n.endsWith(".exe") || n.endsWith(".msi") || n.endsWith(".nsis.zip") || 
+                       n.includes("win") || n.includes("windows") || n.includes("setup");
+            }
+            if (platform === "darwin") {
+                return n.endsWith(".dmg") || n.endsWith(".zip") || n.endsWith(".pkg") ||
+                       n.includes("mac") || n.includes("darwin") || n.includes("osx");
+            }
+            if (platform === "linux") {
+                return n.endsWith(".appimage") || n.endsWith(".tar.gz") || n.endsWith(".deb") || 
+                       n.endsWith(".rpm") || n.endsWith(".snap") || n.includes("linux");
+            }
             return false;
         });
         if (!asset) throw new Error("No suitable asset found for platform: " + platform);
@@ -163,7 +173,7 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
             if (asset.gpgSignatureUrl) {
                 const sigDest = dest + ".sig";
                 if (this.debug) this.sendDebugLog("[Updater:debug] Downloading GPG signature:", asset.gpgSignatureUrl);
-                await this.downloader.downloadAsset(asset.gpgSignatureUrl, sigDest);
+                await this.downloader.downloadAsset(asset.gpgSignatureUrl, sigDest, undefined, undefined);
                 try {
                     await this.downloader.validateGpg(filePath, sigDest);
                     if (this.debug) this.sendDebugLog("[Updater:debug] GPG signature validated for", filePath);

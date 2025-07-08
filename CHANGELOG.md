@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2025-07-08
+
+### Fixed
+- **Critical Download Issue**: Fixed 302 redirect handling in downloader
+- **GitHub Releases**: Now properly follows redirects from GitHub release assets
+- **Error Handling**: Better error messages for download failures
+- **Progress Tracking**: Fixed progress calculation during downloads
+
+### Technical Details
+- Enhanced `Downloader.downloadAsset()` to handle HTTP redirects (301, 302, 307, 308)
+- Added redirect loop protection (max 5 redirects)
+- Improved progress calculation accuracy
+- Better cleanup on download errors
+
+## [1.0.4] - 2025-07-08
+
+### Fixed
+- 🚨 **CRITICAL**: Fixed HTTP redirect handling in Downloader (resolves 302 errors)
+- 🚨 **CRITICAL**: Added missing `checking-for-update` event emission
+- 🚨 **CRITICAL**: Improved GitHub API error handling with detailed error messages
+- ⚠️ **IMPORTANT**: Enhanced asset filtering logic for better platform detection
+- ⚠️ **IMPORTANT**: Added version parsing safety checks
+- ⚠️ **IMPORTANT**: Fixed GPG signature download redirect handling
+- ⚠️ **IMPORTANT**: Improved platform-specific update handlers with proper app quitting
+- ⚠️ **IMPORTANT**: Enhanced Linux installer handling for different package types
+
+### Enhanced
+- Better error messages for network issues and API failures
+- More robust platform asset detection (Windows, macOS, Linux)
+- Improved installer execution for different platforms
+- Added User-Agent header for GitHub API requests
+
 ## [1.0.3] - 2025-07-08
 
 ### Added

@@ -31,41 +31,63 @@ export class Downloader {
         expectedSha256?: string
     ): Promise<string> {
         return new Promise((resolve, reject) => {
-            const file = fs.createWriteStream(destPath);
-            https.get(assetUrl, res => {
-                if (res.statusCode !== 200) {
-                    return reject(new Error(`Failed to download: ${res.statusCode}`));
+            const downloadFile = (url: string, redirectCount = 0) => {
+                if (redirectCount > 5) {
+                    return reject(new Error("Too many redirects"));
                 }
-                const total = parseInt(res.headers["content-length"] || "0", 10);
-                let transferred = 0;
-                res.on("data", chunk => {
-                    transferred += chunk.length;
-                    if (onProgress && total) {
-                        onProgress({
-                            percent: total ? transferred / total : 0,
-                            transferred,
-                            total,
-                        });
+                
+                const file = fs.createWriteStream(destPath);
+                https.get(url, res => {
+                    // Handle redirects (302, 301, etc.)
+                    if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307 || res.statusCode === 308) {
+                        const redirectUrl = res.headers.location;
+                        if (!redirectUrl) {
+                            return reject(new Error("Redirect without location header"));
+                        }
+                        file.close();
+                        return downloadFile(redirectUrl, redirectCount + 1);
                     }
-                });
-                res.pipe(file);
-                file.on("finish", async () => {
-                    file.close(async () => {
-                        if (expectedSha256) {
-                            try {
-                                await this.validateSha256(destPath, expectedSha256);
-                                resolve(destPath);
-                            } catch (err) {
-                                fs.unlink(destPath, () => reject(err));
-                            }
-                        } else {
-                            resolve(destPath);
+                    
+                    if (res.statusCode !== 200) {
+                        return reject(new Error(`Failed to download: ${res.statusCode}`));
+                    }
+                    
+                    const total = parseInt(res.headers["content-length"] || "0", 10);
+                    let transferred = 0;
+                    
+                    res.on("data", chunk => {
+                        transferred += chunk.length;
+                        if (onProgress && total) {
+                            onProgress({
+                                percent: (transferred / total) * 100,
+                                transferred,
+                                total,
+                            });
                         }
                     });
+                    
+                    res.pipe(file);
+                    file.on("finish", async () => {
+                        file.close(async () => {
+                            if (expectedSha256) {
+                                try {
+                                    await this.validateSha256(destPath, expectedSha256);
+                                    resolve(destPath);
+                                } catch (err) {
+                                    fs.unlink(destPath, () => reject(err));
+                                }
+                            } else {
+                                resolve(destPath);
+                            }
+                        });
+                    });
+                }).on("error", err => {
+                    file.close();
+                    fs.unlink(destPath, () => reject(err));
                 });
-            }).on("error", err => {
-                fs.unlink(destPath, () => reject(err));
-            });
+            };
+            
+            downloadFile(assetUrl);
         });
     }
 

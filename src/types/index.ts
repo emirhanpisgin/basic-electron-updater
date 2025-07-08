@@ -44,6 +44,8 @@ export interface UpdateInfo {
  * Event callbacks for Updater.
  */
 export interface UpdateEvents {
+    /** Emitted when checking for updates starts */
+    "checking-for-update": () => void;
     /** Emitted when an update is available */
     "update-available": (info: UpdateInfo) => void;
     /** Emitted when no update is available */

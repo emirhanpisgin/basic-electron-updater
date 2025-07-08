@@ -27,11 +27,34 @@ export class GitHubProvider {
      */
     async getLatestRelease(): Promise<GitHubReleaseResult> {
         const url = `https://api.github.com/repos/${this.repo}/releases`;
-        const res = await fetch(url, {
-            headers: { Accept: "application/vnd.github+json" },
-        });
-        if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
-        const releases: GitHubRelease[] = await res.json();
+        
+        let res: Response;
+        try {
+            res = await fetch(url, {
+                headers: { 
+                    Accept: "application/vnd.github+json",
+                    "User-Agent": "basic-electron-updater"
+                },
+            });
+        } catch (error) {
+            throw new Error(`Network error accessing GitHub API: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        
+        if (!res.ok) {
+            const errorText = await res.text().catch(() => 'Unknown error');
+            throw new Error(`GitHub API error: ${res.status} ${res.statusText} - ${errorText}`);
+        }
+        
+        let releases: GitHubRelease[];
+        try {
+            releases = await res.json();
+        } catch (error) {
+            throw new Error(`Invalid JSON response from GitHub API: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        
+        if (!Array.isArray(releases)) {
+            throw new Error("GitHub API returned invalid data format");
+        }
         const filtered = releases.filter(
             (r) =>
                 !r.draft &&

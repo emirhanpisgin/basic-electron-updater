@@ -5,9 +5,10 @@ import { execFile } from "child_process";
  */
 export function applyMacUpdate(installerPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
-        execFile("open", [installerPath], err => {
+        execFile("open", [installerPath], (err: any) => {
             if (err) return reject(err);
-            // Optionally: quit the Electron app here
+            // For .pkg files, don't quit immediately as user needs to complete installation
+            // For .dmg/.zip files, user will handle the update manually
             resolve();
         });
     });
