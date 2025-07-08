@@ -1,6 +1,6 @@
 {
   "name": "basic-electron-updater",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A secure, cross-platform auto-update library for Electron Forge apps using GitHub Releases.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
