@@ -1,3 +1,4 @@
+import { ipcMain, webContents } from "electron";
 import { TypedEventEmitter } from "./events";
 import { UpdaterConfig, UpdateInfo, UpdateEvents } from "./types";
 import { GitHubProvider } from "./github/GitHubProvider";
@@ -44,11 +45,24 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
         this.currentVersion = this.detectAppVersion();
         this.debug = !!config.debug;
         if (this.debug) {
-            // Print initial config and state
-            // eslint-disable-next-line no-console
-            console.debug("[Updater:debug] Initialized with config:", this.config);
-            console.debug("[Updater:debug] Current version:", this.currentVersion);
+            this.sendDebugLog("[Updater:debug] Initialized with config:", this.config);
+            this.sendDebugLog("[Updater:debug] Current version:", this.currentVersion);
         }
+    }
+
+    private sendDebugLog(message: string, ...args: any[]): void {
+        if (!this.debug) return;
+        // Print to main process console
+        // eslint-disable-next-line no-console
+        console.debug(message, ...args);
+        // Send to all renderer processes if Electron IPC is available
+        try {
+            if (typeof ipcMain !== "undefined" && webContents.getAllWebContents) {
+                for (const wc of webContents.getAllWebContents()) {
+                    wc.send("basic-electron-updater:debug", message, ...args);
+                }
+            }
+        } catch {}
     }
 
     private detectAppVersion(): string {
@@ -57,10 +71,10 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
             // eslint-disable-next-line @typescript-eslint/no-var-requires
             const electron = require("electron");
             const version = electron.app.getVersion();
-            if (this.debug) console.debug("[Updater:debug] Detected Electron app version:", version);
+            if (this.debug) this.sendDebugLog("[Updater:debug] Detected Electron app version:", version);
             return version;
         } catch {
-            if (this.debug) console.debug("[Updater:debug] Could not detect Electron app version, using 0.0.0");
+            if (this.debug) this.sendDebugLog("[Updater:debug] Could not detect Electron app version, using 0.0.0");
             return "0.0.0";
         }
     }
@@ -73,15 +87,15 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
     async checkForUpdates(): Promise<UpdateInfo | null> {
         try {
             this.config.logger.info("Checking for updates...");
-            if (this.debug) console.debug("[Updater:debug] Calling getLatestRelease...");
+            if (this.debug) this.sendDebugLog("[Updater:debug] Calling getLatestRelease...");
             const info = await this.githubProvider.getLatestRelease();
             if (this.debug) {
-                console.debug("[Updater:debug] Latest release info:", info);
-                console.debug("[Updater:debug] Current version:", this.currentVersion);
+                this.sendDebugLog("[Updater:debug] Latest release info:", info);
+                this.sendDebugLog("[Updater:debug] Current version:", this.currentVersion);
             }
             this.lastUpdateInfo = info;
             if (info && semver.valid(info.version) && semver.gt(info.version, this.currentVersion)) {
-                if (this.debug) console.debug("[Updater:debug] Update available:", info.version);
+                if (this.debug) this.sendDebugLog("[Updater:debug] Update available:", info.version);
                 this.emit("update-available", info);
                 this.config.logger.info("Update available:", info.version);
                 if (this.config.autoDownload) {
@@ -89,13 +103,13 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
                 }
                 return info;
             } else {
-                if (this.debug) console.debug("[Updater:debug] No update available.");
+                if (this.debug) this.sendDebugLog("[Updater:debug] No update available.");
                 this.emit("update-not-available");
                 this.config.logger.info("No update available.");
                 return null;
             }
         } catch (err: any) {
-            if (this.debug) console.debug("[Updater:debug] Error in checkForUpdates:", err);
+            if (this.debug) this.sendDebugLog("[Updater:debug] Error in checkForUpdates:", err);
             this.emit("error", err);
             this.config.logger.error("Update check failed:", err);
             return null;
@@ -116,8 +130,8 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
         const platform = os.platform();
         const arch = os.arch();
         if (this.debug) {
-            console.debug("[Updater:debug] Platform:", platform, "Arch:", arch);
-            console.debug("[Updater:debug] Assets:", this.lastUpdateInfo.assets);
+            this.sendDebugLog("[Updater:debug] Platform:", platform, "Arch:", arch);
+            this.sendDebugLog("[Updater:debug] Assets:", this.lastUpdateInfo.assets);
         }
         // Select asset for current platform
         const asset = this.lastUpdateInfo.assets.find((a) => {
@@ -131,8 +145,8 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
         if (!asset) throw new Error("No suitable asset found for platform: " + platform);
         const dest = path.join(os.tmpdir(), asset.name);
         if (this.debug) {
-            console.debug("[Updater:debug] Downloading asset:", asset.url);
-            console.debug("[Updater:debug] Download destination:", dest);
+            this.sendDebugLog("[Updater:debug] Downloading asset:", asset.url);
+            this.sendDebugLog("[Updater:debug] Download destination:", dest);
         }
         this.config.logger.info("Downloading update asset:", asset.url);
         try {
@@ -140,7 +154,7 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
                 asset.url,
                 dest,
                 (progress) => {
-                    if (this.debug) console.debug("[Updater:debug] Download progress:", progress);
+                    if (this.debug) this.sendDebugLog("[Updater:debug] Download progress:", progress);
                     this.emit("download-progress", progress);
                 },
                 asset.sha256
@@ -148,14 +162,14 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
             // GPG signature validation if present
             if (asset.gpgSignatureUrl) {
                 const sigDest = dest + ".sig";
-                if (this.debug) console.debug("[Updater:debug] Downloading GPG signature:", asset.gpgSignatureUrl);
+                if (this.debug) this.sendDebugLog("[Updater:debug] Downloading GPG signature:", asset.gpgSignatureUrl);
                 await this.downloader.downloadAsset(asset.gpgSignatureUrl, sigDest);
                 try {
                     await this.downloader.validateGpg(filePath, sigDest);
-                    if (this.debug) console.debug("[Updater:debug] GPG signature validated for", filePath);
+                    if (this.debug) this.sendDebugLog("[Updater:debug] GPG signature validated for", filePath);
                     this.config.logger.info("GPG signature validated for", filePath);
                 } catch (err: any) {
-                    if (this.debug) console.debug("[Updater:debug] GPG validation failed:", err);
+                    if (this.debug) this.sendDebugLog("[Updater:debug] GPG validation failed:", err);
                     this.emit("error", err);
                     this.config.logger.error("GPG validation failed:", err);
                     throw err;
@@ -166,7 +180,7 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
             this.lastDownloadedPath = filePath;
             return filePath;
         } catch (err: any) {
-            if (this.debug) console.debug("[Updater:debug] Download failed:", err);
+            if (this.debug) this.sendDebugLog("[Updater:debug] Download failed:", err);
             this.emit("error", err);
             this.config.logger.error("Download failed:", err);
             throw err;
@@ -183,7 +197,7 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
             throw new Error("No downloaded update to apply. Call downloadUpdate() first.");
         }
         const platform = os.platform();
-        if (this.debug) console.debug("[Updater:debug] Applying update for platform:", platform);
+        if (this.debug) this.sendDebugLog("[Updater:debug] Applying update for platform:", platform);
         this.config.logger.info("Applying update for platform:", platform);
         try {
             if (platform === "win32") {
@@ -195,10 +209,10 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
             } else {
                 throw new Error("Unsupported platform: " + platform);
             }
-            if (this.debug) console.debug("[Updater:debug] Update applied (installer launched).");
+            if (this.debug) this.sendDebugLog("[Updater:debug] Update applied (installer launched).");
             this.config.logger.info("Update applied (installer launched).");
         } catch (err: any) {
-            if (this.debug) console.debug("[Updater:debug] Failed to apply update:", err);
+            if (this.debug) this.sendDebugLog("[Updater:debug] Failed to apply update:", err);
             this.emit("error", err);
             this.config.logger.error("Failed to apply update:", err);
             throw err;
