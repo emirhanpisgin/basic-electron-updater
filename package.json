@@ -38,13 +38,17 @@
   "author": "emirhanpisgin emirhanpgt@gmail.com",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^24.0.10",
     "@types/mocha": "^10.0.0",
+    "@types/node": "^24.0.10",
+    "@types/semver": "^7.7.0",
     "mocha": "^10.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "semver": "^7.7.2"
   }
 }

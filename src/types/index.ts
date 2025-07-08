@@ -12,6 +12,8 @@ export interface UpdaterConfig {
     channel?: string;
     /** Custom logger (defaults to console) */
     logger?: Logger;
+    /** Enable verbose debug output (default: false) */
+    debug?: boolean;
     // Add more config options as needed
 }
 

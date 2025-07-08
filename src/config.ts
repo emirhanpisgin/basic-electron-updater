@@ -7,6 +7,7 @@ export function resolveConfig(userConfig: UpdaterConfig): Required<UpdaterConfig
         allowPrerelease: false,
         channel: "latest",
         logger: defaultLogger,
+        debug: userConfig.debug ?? false,
         ...userConfig,
     };
 }
