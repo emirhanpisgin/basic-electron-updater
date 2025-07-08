@@ -63,8 +63,8 @@ export interface UpdateEvents {
  * Logger interface for custom logging.
  */
 export interface Logger {
-    info(...args: any[]): void;
-    warn(...args: any[]): void;
-    error(...args: any[]): void;
-    debug?(...args: any[]): void;
+    info(message: string, ...args: unknown[]): void;
+    warn(message: string, ...args: unknown[]): void;
+    error(message: string, ...args: unknown[]): void;
+    debug?(message: string, ...args: unknown[]): void;
 }

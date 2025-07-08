@@ -20,13 +20,13 @@ export function applyLinuxUpdate(installerPath: string): Promise<void> {
             const isPackageManager = installerPath.endsWith('.deb') || installerPath.endsWith('.rpm');
             if (isPackageManager) {
                 // For package managers, we can't auto-install, just open the file
-                execFile("xdg-open", [installerPath], (err: any) => {
+                execFile("xdg-open", [installerPath], (err: Error | null) => {
                     if (err) return reject(err);
                     resolve();
                 });
             } else {
                 // For AppImage or other executables
-                execFile(installerPath, [], (err: any) => {
+                execFile(installerPath, [], (err: Error | null) => {
                     if (err) return reject(err);
                     resolve();
                 });

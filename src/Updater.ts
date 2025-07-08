@@ -62,7 +62,9 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
                     wc.send("basic-electron-updater:debug", message, ...args);
                 }
             }
-        } catch {}
+        } catch {
+            // Ignore errors when not in Electron context
+        }
     }
 
     private detectAppVersion(): string {
@@ -110,10 +112,11 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
                 this.config.logger.info("No update available.");
                 return null;
             }
-        } catch (err: any) {
-            if (this.debug) this.sendDebugLog("[Updater:debug] Error in checkForUpdates:", err);
-            this.emit("error", err);
-            this.config.logger.error("Update check failed:", err);
+        } catch (err: unknown) {
+            const error = err instanceof Error ? err : new Error(String(err));
+            if (this.debug) this.sendDebugLog("[Updater:debug] Error in checkForUpdates:", error);
+            this.emit("error", error);
+            this.config.logger.error("Update check failed:", error);
             return null;
         }
     }
@@ -178,22 +181,24 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
                     await this.downloader.validateGpg(filePath, sigDest);
                     if (this.debug) this.sendDebugLog("[Updater:debug] GPG signature validated for", filePath);
                     this.config.logger.info("GPG signature validated for", filePath);
-                } catch (err: any) {
-                    if (this.debug) this.sendDebugLog("[Updater:debug] GPG validation failed:", err);
-                    this.emit("error", err);
-                    this.config.logger.error("GPG validation failed:", err);
-                    throw err;
+                } catch (err: unknown) {
+                    const error = err instanceof Error ? err : new Error(String(err));
+                    if (this.debug) this.sendDebugLog("[Updater:debug] GPG validation failed:", error);
+                    this.emit("error", error);
+                    this.config.logger.error("GPG validation failed:", error);
+                    throw error;
                 }
             }
             this.emit("downloaded", filePath);
             this.config.logger.info("Downloaded update to:", filePath);
             this.lastDownloadedPath = filePath;
             return filePath;
-        } catch (err: any) {
-            if (this.debug) this.sendDebugLog("[Updater:debug] Download failed:", err);
-            this.emit("error", err);
-            this.config.logger.error("Download failed:", err);
-            throw err;
+        } catch (err: unknown) {
+            const error = err instanceof Error ? err : new Error(String(err));
+            if (this.debug) this.sendDebugLog("[Updater:debug] Download failed:", error);
+            this.emit("error", error);
+            this.config.logger.error("Download failed:", error);
+            throw error;
         }
     }
 
@@ -221,11 +226,12 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
             }
             if (this.debug) this.sendDebugLog("[Updater:debug] Update applied (installer launched).");
             this.config.logger.info("Update applied (installer launched).");
-        } catch (err: any) {
-            if (this.debug) this.sendDebugLog("[Updater:debug] Failed to apply update:", err);
-            this.emit("error", err);
-            this.config.logger.error("Failed to apply update:", err);
-            throw err;
+        } catch (err: unknown) {
+            const error = err instanceof Error ? err : new Error(String(err));
+            if (this.debug) this.sendDebugLog("[Updater:debug] Failed to apply update:", error);
+            this.emit("error", error);
+            this.config.logger.error("Failed to apply update:", error);
+            throw error;
         }
     }
 }

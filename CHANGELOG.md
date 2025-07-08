@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2025-07-08
+
+### Fixed
+- **Code Quality**: Fixed all ESLint errors and warnings
+- **Type Safety**: Improved error handling with proper Error types instead of `any`
+- **Logger Interface**: Enhanced Logger interface with better type definitions
+- **Platform Handlers**: Fixed error callback types in platform-specific update handlers
+
+### Technical Details
+- Removed unused imports (UpdateInfo, fs)
+- Fixed empty catch blocks with proper comments
+- Improved error handling with `unknown` type and proper Error conversion
+- Added missing return type annotations
+- Enhanced type safety across all modules
+
 ## [1.0.5] - 2025-07-08
 
 ### Fixed

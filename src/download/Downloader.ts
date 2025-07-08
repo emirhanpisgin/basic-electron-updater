@@ -1,7 +1,6 @@
 import * as https from "https";
 import * as fs from "fs";
 import * as crypto from "crypto";
-import { UpdateInfo } from "../types";
 import { validateGpgSignature } from "./validators/gpg";
 
 export interface DownloadProgress {
@@ -31,7 +30,7 @@ export class Downloader {
         expectedSha256?: string
     ): Promise<string> {
         return new Promise((resolve, reject) => {
-            const downloadFile = (url: string, redirectCount = 0) => {
+            const downloadFile = (url: string, redirectCount = 0): void => {
                 if (redirectCount > 5) {
                     return reject(new Error("Too many redirects"));
                 }

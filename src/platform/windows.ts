@@ -9,7 +9,7 @@ export function applyWindowsUpdate(installerPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
         // Launch the installer without any arguments
         // Most Windows installers handle updates automatically when launched
-        execFile(installerPath, [], (err: any) => {
+        execFile(installerPath, [], (err: Error | null) => {
             if (err) return reject(err);
             // Quit the Electron app after starting the installer
             try {

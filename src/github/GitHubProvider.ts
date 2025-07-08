@@ -1,5 +1,4 @@
 import { GitHubProviderOptions, GitHubRelease, GitHubReleaseResult } from "./types";
-import { UpdateInfo } from "../types";
 
 /**
  * GitHubProvider fetches release data from the GitHub API for the configured repo.
@@ -22,7 +21,7 @@ export class GitHubProvider {
 
     /**
      * Fetches the latest release matching the config (channel, prerelease, etc).
-     * @returns UpdateInfo if available, otherwise null
+     * @returns GitHubReleaseResult if available, otherwise null
      * @throws Error if the GitHub API request fails
      */
     async getLatestRelease(): Promise<GitHubReleaseResult> {
