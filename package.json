@@ -1,0 +1,51 @@
+{
+  "name": "basic-electron-updater",
+  "version": "1.0.0",
+  "description": "A secure, cross-platform auto-update library for Electron Forge apps using GitHub Releases.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "test": "mocha --require ts-node/register test/**/*.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/emirhanpisgin/basic-electron-updater.git"
+  },
+  "homepage": "https://github.com/emirhanpisgin/basic-electron-updater#readme",
+  "bugs": {
+    "url": "https://github.com/emirhanpisgin/basic-electron-updater/issues"
+  },
+  "keywords": [
+    "electron",
+    "auto-update",
+    "updater",
+    "github",
+    "electron-forge"
+  ],
+  "author": "YOUR NAME <your@email.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "@types/mocha": "^10.0.0",
+    "mocha": "^10.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
