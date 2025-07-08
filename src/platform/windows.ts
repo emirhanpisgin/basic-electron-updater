@@ -2,15 +2,14 @@ import { execFile } from "child_process";
 
 /**
  * Launches the downloaded installer and exits the app.
- * For NSIS/EXE, this will start the installer and quit the app.
+ * For NSIS/EXE installers, this will start the installer and quit the app.
+ * Most Windows installers (including Squirrel.Windows) should be launched without arguments.
  */
 export function applyWindowsUpdate(installerPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
-        // For Squirrel.Windows, the installer may require different arguments
-        const isSquirrelInstaller = installerPath.toLowerCase().includes('setup.exe');
-        const args = isSquirrelInstaller ? ['--update'] : [];
-        
-        execFile(installerPath, args, (err: any) => {
+        // Launch the installer without any arguments
+        // Most Windows installers handle updates automatically when launched
+        execFile(installerPath, [], (err: any) => {
             if (err) return reject(err);
             // Quit the Electron app after starting the installer
             try {

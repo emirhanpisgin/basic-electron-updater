@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2025-07-08
+
+### Fixed
+- **Windows Installer Launch**: Removed problematic `--update` flag from Windows installer execution
+- **Compatibility**: Fixed compatibility with Squirrel.Windows and NSIS installers
+- **Auto-Update Flow**: Windows installers now launch correctly without arguments
+
+### Technical Details
+- Simplified `applyWindowsUpdate()` to launch installers without any command-line arguments
+- Most Windows installers handle updates automatically when launched
+- Better compatibility across different Windows installer types
+
 ## [1.0.4] - 2025-07-08
 
 ### Fixed
