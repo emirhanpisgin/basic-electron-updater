@@ -18,8 +18,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepare": "npm run build",
-    "test": "mocha --require ts-node/register test/**/*.ts"
+    "prepare": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -36,7 +35,7 @@
     "github",
     "electron-forge"
   ],
-  "author": "YOUR NAME <your@email.com>",
+  "author": "emirhanpisgin emirhanpgt@gmail.com",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^24.0.10",
