@@ -1,6 +1,7 @@
 import { ipcMain, webContents } from "electron";
+import * as fs from "fs";
 import { TypedEventEmitter } from "./events";
-import { UpdaterConfig, UpdateInfo, UpdateEvents } from "./types";
+import { UpdaterConfig, UpdateInfo, UpdateEvents, UpdateOptions } from "./types";
 import { GitHubProvider } from "./github/GitHubProvider";
 import { resolveConfig } from "./config";
 import { Downloader } from "./download/Downloader";
@@ -10,6 +11,13 @@ import { applyWindowsUpdate } from "./platform/windows";
 import { applyMacUpdate } from "./platform/macos";
 import { applyLinuxUpdate } from "./platform/linux";
 import * as semver from "semver";
+import {
+    abortErrorFromSignal,
+    createAbortContext,
+    isAbortError,
+    isTimeoutError,
+    toError,
+} from "./utils/abort";
 
 /**
  * Updater provides secure, cross-platform auto-update support for Electron Forge apps using GitHub Releases.
@@ -84,14 +92,29 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
     /**
      * Checks GitHub Releases for the latest update.
      * Emits 'update-available' or 'update-not-available'.
+     *
+     * Rejects with an Error named `AbortError` when `options.signal` is
+     * aborted, or `TimeoutError` when `options.timeoutMs` expires. Ordinary
+     * failures still emit 'error' and resolve to null.
+     *
+     * @param options Optional abort signal and operation timeout
      * @returns UpdateInfo if available, otherwise null
      */
-    async checkForUpdates(): Promise<UpdateInfo | null> {
+    async checkForUpdates(options: UpdateOptions = {}): Promise<UpdateInfo | null> {
+        const context = createAbortContext(options);
         try {
+            if (context.signal?.aborted) {
+                throw abortErrorFromSignal(context.signal);
+            }
             this.emit("checking-for-update");
             this.config.logger.info("Checking for updates...");
             if (this.debug) this.sendDebugLog("[Updater:debug] Calling getLatestRelease...");
-            const info = await this.githubProvider.getLatestRelease();
+            const info = await this.githubProvider.getLatestRelease({
+                signal: context.signal,
+            });
+            if (context.signal?.aborted) {
+                throw abortErrorFromSignal(context.signal);
+            }
             if (this.debug) {
                 this.sendDebugLog("[Updater:debug] Latest release info:", info);
                 this.sendDebugLog("[Updater:debug] Current version:", this.currentVersion);
@@ -99,11 +122,21 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
             this.lastUpdateInfo = info;
             if (info && semver.valid(info.version) && semver.valid(this.currentVersion) && 
                 semver.gt(info.version, this.currentVersion)) {
+                if (context.signal?.aborted) {
+                    throw abortErrorFromSignal(context.signal);
+                }
                 if (this.debug) this.sendDebugLog("[Updater:debug] Update available:", info.version);
                 this.emit("update-available", info);
                 this.config.logger.info("Update available:", info.version);
                 if (this.config.autoDownload) {
-                    this.downloadUpdate();
+                    // A failed automatic download is already reported through
+                    // the download's own 'error' event; keep the check result
+                    // from turning into an unhandled rejection.
+                    const autoOptions: UpdateOptions | undefined =
+                        options.signal || options.timeoutMs !== undefined
+                            ? { signal: options.signal, timeoutMs: options.timeoutMs }
+                            : undefined;
+                    void this.downloadUpdate(autoOptions).catch(() => undefined);
                 }
                 return info;
             } else {
@@ -113,11 +146,23 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
                 return null;
             }
         } catch (err: unknown) {
-            const error = err instanceof Error ? err : new Error(String(err));
+            const error = toError(err);
+            if (context.signal?.aborted || isAbortError(error) || isTimeoutError(error)) {
+                const cancellation = context.signal?.aborted
+                    ? abortErrorFromSignal(context.signal)
+                    : error;
+                if (isTimeoutError(cancellation)) {
+                    this.emit("error", cancellation);
+                    this.config.logger.error("Update check timed out:", cancellation);
+                }
+                throw cancellation;
+            }
             if (this.debug) this.sendDebugLog("[Updater:debug] Error in checkForUpdates:", error);
             this.emit("error", error);
             this.config.logger.error("Update check failed:", error);
             return null;
+        } finally {
+            context.cleanup();
         }
     }
 
@@ -125,44 +170,56 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
      * Downloads the update asset for the current platform.
      * Emits 'download-progress' and 'downloaded'.
      * Validates SHA256 and GPG signature if provided.
+     *
+     * Emits and stores nothing when `options.signal` is aborted; the promise
+     * rejects with an `AbortError` (or `TimeoutError` after a timeout).
+     *
+     * @param options Optional abort signal and operation timeout
      * @returns Path to the downloaded file
      * @throws Error if download or validation fails
      */
-    async downloadUpdate(): Promise<string> {
+    async downloadUpdate(options: UpdateOptions = {}): Promise<string> {
         if (!this.lastUpdateInfo) {
             throw new Error("No update info available. Call checkForUpdates() first.");
         }
-        const platform = os.platform();
-        const arch = os.arch();
-        if (this.debug) {
-            this.sendDebugLog("[Updater:debug] Platform:", platform, "Arch:", arch);
-            this.sendDebugLog("[Updater:debug] Assets:", this.lastUpdateInfo.assets);
-        }
-        // Select asset for current platform
-        const asset = this.lastUpdateInfo.assets.find((a) => {
-            const n = a.name.toLowerCase();
-            if (platform === "win32") {
-                return n.endsWith(".exe") || n.endsWith(".msi") || n.endsWith(".nsis.zip") || 
-                       n.includes("win") || n.includes("windows") || n.includes("setup");
-            }
-            if (platform === "darwin") {
-                return n.endsWith(".dmg") || n.endsWith(".zip") || n.endsWith(".pkg") ||
-                       n.includes("mac") || n.includes("darwin") || n.includes("osx");
-            }
-            if (platform === "linux") {
-                return n.endsWith(".appimage") || n.endsWith(".tar.gz") || n.endsWith(".deb") || 
-                       n.endsWith(".rpm") || n.endsWith(".snap") || n.includes("linux");
-            }
-            return false;
-        });
-        if (!asset) throw new Error("No suitable asset found for platform: " + platform);
-        const dest = path.join(os.tmpdir(), asset.name);
-        if (this.debug) {
-            this.sendDebugLog("[Updater:debug] Downloading asset:", asset.url);
-            this.sendDebugLog("[Updater:debug] Download destination:", dest);
-        }
-        this.config.logger.info("Downloading update asset:", asset.url);
+        const context = createAbortContext(options);
+        let downloadedPath: string | undefined;
+        let signaturePath: string | undefined;
         try {
+            if (context.signal?.aborted) {
+                throw abortErrorFromSignal(context.signal);
+            }
+
+            const platform = os.platform();
+            const arch = os.arch();
+            if (this.debug) {
+                this.sendDebugLog("[Updater:debug] Platform:", platform, "Arch:", arch);
+                this.sendDebugLog("[Updater:debug] Assets:", this.lastUpdateInfo.assets);
+            }
+            // Select asset for current platform
+            const asset = this.lastUpdateInfo.assets.find((a) => {
+                const n = a.name.toLowerCase();
+                if (platform === "win32") {
+                    return n.endsWith(".exe") || n.endsWith(".msi") || n.endsWith(".nsis.zip") ||
+                           n.includes("win") || n.includes("windows") || n.includes("setup");
+                }
+                if (platform === "darwin") {
+                    return n.endsWith(".dmg") || n.endsWith(".zip") || n.endsWith(".pkg") ||
+                           n.includes("mac") || n.includes("darwin") || n.includes("osx");
+                }
+                if (platform === "linux") {
+                    return n.endsWith(".appimage") || n.endsWith(".tar.gz") || n.endsWith(".deb") ||
+                           n.endsWith(".rpm") || n.endsWith(".snap") || n.includes("linux");
+                }
+                return false;
+            });
+            if (!asset) throw new Error("No suitable asset found for platform: " + platform);
+            const dest = path.join(os.tmpdir(), asset.name);
+            if (this.debug) {
+                this.sendDebugLog("[Updater:debug] Downloading asset:", asset.url);
+                this.sendDebugLog("[Updater:debug] Download destination:", dest);
+            }
+            this.config.logger.info("Downloading update asset:", asset.url);
             const filePath = await this.downloader.downloadAsset(
                 asset.url,
                 dest,
@@ -170,35 +227,84 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
                     if (this.debug) this.sendDebugLog("[Updater:debug] Download progress:", progress);
                     this.emit("download-progress", progress);
                 },
-                asset.sha256
+                asset.sha256,
+                { signal: context.signal }
             );
+            downloadedPath = filePath;
+            if (context.signal?.aborted) {
+                await this.discardDownload(filePath);
+                throw abortErrorFromSignal(context.signal);
+            }
             // GPG signature validation if present
             if (asset.gpgSignatureUrl) {
-                const sigDest = dest + ".sig";
+                signaturePath = dest + ".sig";
                 if (this.debug) this.sendDebugLog("[Updater:debug] Downloading GPG signature:", asset.gpgSignatureUrl);
-                await this.downloader.downloadAsset(asset.gpgSignatureUrl, sigDest, undefined, undefined);
+                await this.downloader.downloadAsset(
+                    asset.gpgSignatureUrl,
+                    signaturePath,
+                    undefined,
+                    undefined,
+                    { signal: context.signal }
+                );
                 try {
-                    await this.downloader.validateGpg(filePath, sigDest);
+                    await this.downloader.validateGpg(
+                        filePath,
+                        signaturePath,
+                        undefined,
+                        { signal: context.signal }
+                    );
                     if (this.debug) this.sendDebugLog("[Updater:debug] GPG signature validated for", filePath);
                     this.config.logger.info("GPG signature validated for", filePath);
                 } catch (err: unknown) {
-                    const error = err instanceof Error ? err : new Error(String(err));
+                    const error = toError(err);
+                    if (context.signal?.aborted || isAbortError(error) || isTimeoutError(error)) {
+                        throw error;
+                    }
                     if (this.debug) this.sendDebugLog("[Updater:debug] GPG validation failed:", error);
                     this.emit("error", error);
                     this.config.logger.error("GPG validation failed:", error);
                     throw error;
                 }
             }
+            if (context.signal?.aborted) {
+                await this.discardDownload(filePath, signaturePath);
+                throw abortErrorFromSignal(context.signal);
+            }
             this.emit("downloaded", filePath);
             this.config.logger.info("Downloaded update to:", filePath);
             this.lastDownloadedPath = filePath;
             return filePath;
         } catch (err: unknown) {
-            const error = err instanceof Error ? err : new Error(String(err));
+            const error = toError(err);
+            if (context.signal?.aborted || isAbortError(error) || isTimeoutError(error)) {
+                const cancellation = context.signal?.aborted
+                    ? abortErrorFromSignal(context.signal)
+                    : error;
+                this.lastDownloadedPath = null;
+                await this.discardDownload(downloadedPath, signaturePath);
+                if (isTimeoutError(cancellation)) {
+                    this.emit("error", cancellation);
+                    this.config.logger.error("Download timed out:", cancellation);
+                }
+                throw cancellation;
+            }
             if (this.debug) this.sendDebugLog("[Updater:debug] Download failed:", error);
             this.emit("error", error);
             this.config.logger.error("Download failed:", error);
             throw error;
+        } finally {
+            context.cleanup();
+        }
+    }
+
+    private async discardDownload(...filePaths: Array<string | undefined>): Promise<void> {
+        for (const filePath of filePaths) {
+            if (!filePath) continue;
+            try {
+                await fs.promises.rm(filePath, { force: true });
+            } catch {
+                // Best effort cleanup; the cancellation error is what matters.
+            }
         }
     }
 

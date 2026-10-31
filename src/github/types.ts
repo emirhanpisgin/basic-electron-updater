@@ -18,10 +18,27 @@ export interface GitHubRelease {
     published_at: string;
 }
 
+/** Minimal fetch shape used by the provider; tests inject a fake. */
+export type FetchLike = (
+    input: string,
+    init?: {
+        headers?: Record<string, string>;
+        signal?: AbortSignal;
+    }
+) => Promise<{
+    ok: boolean;
+    status: number;
+    statusText: string;
+    text(): Promise<string>;
+    json(): Promise<unknown>;
+}>;
+
 export interface GitHubProviderOptions {
     repo: string;
     allowPrerelease?: boolean;
     channel?: string;
+    /** @internal Test seam; defaults to the global fetch. */
+    fetchImpl?: FetchLike;
 }
 
 export type GitHubReleaseResult = UpdateInfo | null;

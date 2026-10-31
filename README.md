@@ -5,8 +5,9 @@ A secure, cross-platform auto-update library for Electron Forge apps using GitHu
 ## Features
 
 -   **Cross-platform:** Windows, macOS, Linux
--   **Secure:** HTTPS-only, SHA256, optional GPG, code-signing validation
+-   **HTTPS-only downloads** with optional SHA256/GPG checks when release metadata supplies compatible fields; code signing is planned, not implemented
 -   **Event-based API:** update-available, download-progress, downloaded, error
+-   **Cancellation and timeouts:** optional `AbortSignal` and `timeoutMs` on checks and downloads
 -   **Manual & automatic update checking**
 -   **Easy integration:** import, instantiate, call methods
 -   **Electron >=27 support**
@@ -44,6 +45,27 @@ updater.on("error", (err) => {
 updater.checkForUpdates();
 ```
 
+### Cancel or bound an operation
+
+```ts
+const controller = new AbortController();
+// Call controller.abort() from your app's shutdown/cancel handler.
+
+try {
+    await updater.checkForUpdates({
+        signal: controller.signal,
+        timeoutMs: 30_000,
+    });
+} catch (error) {
+    if ((error as Error).name === "AbortError") return;
+    throw error;
+}
+```
+
+Aborting never emits `downloaded` and clears the downloaded path. A timeout
+rejects with an Error named `TimeoutError` and also emits `error`. Both options
+are optional; omitting them keeps the previous behavior.
+
 ## API
 
 ### `new Updater(config: UpdaterConfig)`
@@ -64,16 +86,21 @@ updater.checkForUpdates();
 
 ### Methods
 
--   `checkForUpdates(): Promise<UpdateInfo | null>` — Check for updates
--   `downloadUpdate(): Promise<string>` — Download update asset
+-   `checkForUpdates(options?: UpdateOptions): Promise<UpdateInfo | null>` — Check for updates
+-   `downloadUpdate(options?: UpdateOptions): Promise<string>` — Download update asset
 -   `applyUpdate(): Promise<void>` — Launch installer/apply update
+
+`UpdateOptions` is `{ signal?: AbortSignal; timeoutMs?: number }`. A caller
+abort rejects with an Error named `AbortError`; a timeout rejects with
+`TimeoutError` and emits `error`. Omitting the options preserves the old
+non-cancellable behavior.
 
 ## Security
 
--   All downloads use HTTPS
--   SHA256 hash validation (if provided)
--   Optional GPG signature validation
--   Code-signing validation (macOS/Windows, planned)
+-   All downloads use HTTPS.
+-   SHA256 and GPG checks are optional and depend on release metadata exposing compatible fields. GitHub's `digest` field is not mapped by the current provider, so these checks are often inactive.
+-   Code signing is planned, not implemented.
+-   These checks are integrity aids, not publisher-authenticity guarantees: no publisher key is pinned, and the downloaded file is written before validation.
 
 ## Example: Electron Forge Integration
 

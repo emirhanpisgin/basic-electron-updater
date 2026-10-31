@@ -18,6 +18,24 @@ export interface UpdaterConfig {
 }
 
 /**
+ * Options shared by update operations.
+ *
+ * - `signal`: cancels the operation. A caller abort rejects with an Error named
+ *   `AbortError`; the updater never emits `downloaded` or stores the path.
+ * - `timeoutMs`: bounds the whole operation. Expiry rejects with an Error named
+ *   `TimeoutError` and also emits `error`.
+ *
+ * Both options are optional. Omitting them preserves the existing
+ * non-cancellable behavior.
+ */
+export interface UpdateOptions {
+    /** Cancels fetches, downloads and in-flight stream writes. */
+    signal?: AbortSignal;
+    /** Positive, finite timeout in milliseconds for the whole operation. */
+    timeoutMs?: number;
+}
+
+/**
  * Information about an available update from GitHub Releases.
  */
 export interface UpdateInfo {

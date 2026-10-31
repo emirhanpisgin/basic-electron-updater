@@ -16,14 +16,36 @@ new Updater(config: UpdaterConfig)
 
 ### Methods
 
-#### `checkForUpdates(): Promise<UpdateInfo | null>`
+#### `checkForUpdates(options?: UpdateOptions): Promise<UpdateInfo | null>`
 Checks GitHub Releases for the latest update. Emits `update-available` or `update-not-available`.
 
-#### `downloadUpdate(): Promise<string>`
-Downloads the update asset for the current platform. Emits `download-progress` and `downloaded`. Validates SHA256 and GPG signature if provided.
+-   Without options, ordinary failures emit `error` and resolve to `null` (unchanged behavior).
+-   If `options.signal` is aborted, the promise rejects with an Error named `AbortError`; no check result is emitted.
+-   If `options.timeoutMs` expires, the promise rejects with an Error named `TimeoutError` and emits `error`.
+
+#### `downloadUpdate(options?: UpdateOptions): Promise<string>`
+Downloads the update asset for the current platform. Emits `download-progress` and `downloaded`. May validate SHA256/GPG when the release metadata supplies compatible fields; this is not a publisher-authenticity check.
+
+-   On caller abort the promise rejects with `AbortError`, partial files are removed, `downloaded` is not emitted, and the stored download path is cleared.
+-   On timeout the promise rejects with `TimeoutError`, partial files are removed, and `error` is emitted.
+-   A cancelled or timed-out new attempt never leaves an older downloaded path marked for `applyUpdate()`.
+-   Omitting options preserves the previous behavior.
 
 #### `applyUpdate(): Promise<void>`
 Applies the downloaded update by launching the installer or archive. Handles platform-specific logic.
+
+### UpdateOptions
+
+```ts
+interface UpdateOptions {
+  /** Cancels the operation. Abort rejects with an Error named AbortError. */
+  signal?: AbortSignal;
+  /** Positive, finite overall timeout in milliseconds. */
+  timeoutMs?: number;
+}
+```
+
+Both fields are optional. `timeoutMs` must be a positive finite number, otherwise the method rejects with a `RangeError`. Cancellation destroys the request, response and file streams, removes partial files, and settles the promise once.
 
 ### Events
 
@@ -72,7 +94,7 @@ interface Logger {
 ```
 
 ## Security
-- All downloads use HTTPS
-- SHA256 hash validation (if provided)
-- Optional GPG signature validation
-- Code-signing validation (planned)
+- All downloads use HTTPS.
+- SHA256/GPG validation is optional and metadata-dependent; GitHub's `digest` field is not currently mapped, so it is often inactive.
+- Code signing is planned, not implemented.
+- These checks do not establish publisher identity (no pinned key) and occur after download.
