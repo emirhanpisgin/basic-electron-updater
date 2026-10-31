@@ -75,6 +75,41 @@ are optional; omitting them keeps the previous behavior.
 -   `allowPrerelease`: Allow prerelease versions (default: false)
 -   `channel`: Release channel/tag (default: 'latest')
 -   `logger`: Custom logger (defaults to console)
+-   `assetPolicy`: Explicit release-asset contract (see below)
+
+### Asset policy
+
+`downloadUpdate()` selects exactly one asset that matches the configured product,
+platform and architecture. It no longer picks the first broad Windows-name
+match.
+
+```ts
+const updater = new Updater({
+    repo: "MelodifyApp/melodify",
+    assetPolicy: {
+        product: "Melodify",
+        // platform defaults to the runtime platform
+        // arch defaults to the runtime architecture
+    },
+});
+```
+
+-   A matching asset starts with the product token and the supported installer
+    extension for the platform, then carries the runtime architecture token,
+    e.g. `Melodify-1.0.7-win32-x64.exe`.
+-   The product defaults to the repository name. `platform` and `arch` default
+    to the runtime values and must match them when set.
+-   Windows accepts `.exe`, `.msi` and `.nsis.zip`; macOS and Linux keep their
+    existing extensions.
+-   On Windows, the exact legacy name `<product>.Setup.exe` is accepted when no
+    architecture-specific asset for the same platform is present. Set
+    `legacyAssetName` to another exact name, or `null` to disable legacy
+    matching.
+-   Zero matches, multiple equally valid matches, and mixed legacy/current
+    assets fail with an `AssetSelectionError` before any download starts.
+
+This is an asset-selection contract only. It does not add Authenticode,
+publisher-key verification, or a TOCTOU guarantee.
 
 ### Events
 

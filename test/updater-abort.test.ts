@@ -67,6 +67,10 @@ function createUpdater(
     const updater = new Updater({
         repo: "owner/repo",
         autoDownload,
+        assetPolicy: {
+            product: "Melodify",
+            legacyAssetName: "Melodify Setup.exe",
+        },
         logger: {
             info: () => undefined,
             warn: () => undefined,

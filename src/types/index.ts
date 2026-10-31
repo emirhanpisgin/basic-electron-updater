@@ -14,7 +14,44 @@ export interface UpdaterConfig {
     logger?: Logger;
     /** Enable verbose debug output (default: false) */
     debug?: boolean;
+    /**
+     * Explicit release asset contract.
+     *
+     * When omitted, `product` defaults to the repository name and the only
+     * arch-less name accepted on Windows is `<product>.Setup.exe`.
+     */
+    assetPolicy?: AssetPolicy;
     // Add more config options as needed
+}
+
+/** Platforms with a defined release-asset naming contract. */
+export type AssetPlatform = "win32" | "darwin" | "linux";
+
+/** Architectures with a defined release-asset naming contract. */
+export type AssetArch = "x64" | "ia32" | "arm64" | "arm";
+
+/**
+ * Release asset naming contract.
+ *
+ * A matching asset must start with `product`, use a supported installer
+ * extension for the runtime platform and carry the runtime architecture as a
+ * name token (for example `Melodify-1.0.7-win32-x64.exe`). An exact legacy
+ * name without an architecture token is accepted only when no other
+ * architecture-specific asset for the same platform is present.
+ */
+export interface AssetPolicy {
+    /** Product identity token at the start of the asset name. */
+    product?: string;
+    /** Expected platform; defaults to and must match the runtime platform. */
+    platform?: AssetPlatform;
+    /** Expected architecture; defaults to and must match the runtime architecture. */
+    arch?: AssetArch;
+    /**
+     * Exact legacy installer name accepted for this platform.
+     * Defaults to `<product>.Setup.exe` on Windows; `null` disables legacy
+     * matching. Other platforms accept no legacy name by default.
+     */
+    legacyAssetName?: string | null;
 }
 
 /**

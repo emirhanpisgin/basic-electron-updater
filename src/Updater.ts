@@ -11,6 +11,7 @@ import { applyWindowsUpdate } from "./platform/windows";
 import { applyMacUpdate } from "./platform/macos";
 import { applyLinuxUpdate } from "./platform/linux";
 import * as semver from "semver";
+import { selectReleaseAsset } from "./assets/selectAsset";
 import {
     abortErrorFromSignal,
     createAbortContext,
@@ -196,24 +197,14 @@ export default class Updater extends TypedEventEmitter<UpdateEvents> {
                 this.sendDebugLog("[Updater:debug] Platform:", platform, "Arch:", arch);
                 this.sendDebugLog("[Updater:debug] Assets:", this.lastUpdateInfo.assets);
             }
-            // Select asset for current platform
-            const asset = this.lastUpdateInfo.assets.find((a) => {
-                const n = a.name.toLowerCase();
-                if (platform === "win32") {
-                    return n.endsWith(".exe") || n.endsWith(".msi") || n.endsWith(".nsis.zip") ||
-                           n.includes("win") || n.includes("windows") || n.includes("setup");
-                }
-                if (platform === "darwin") {
-                    return n.endsWith(".dmg") || n.endsWith(".zip") || n.endsWith(".pkg") ||
-                           n.includes("mac") || n.includes("darwin") || n.includes("osx");
-                }
-                if (platform === "linux") {
-                    return n.endsWith(".appimage") || n.endsWith(".tar.gz") || n.endsWith(".deb") ||
-                           n.endsWith(".rpm") || n.endsWith(".snap") || n.includes("linux");
-                }
-                return false;
-            });
-            if (!asset) throw new Error("No suitable asset found for platform: " + platform);
+            const asset = selectReleaseAsset(
+                this.lastUpdateInfo.assets,
+                this.config.assetPolicy,
+                { platform, arch }
+            );
+            if (this.debug) {
+                this.sendDebugLog("[Updater:debug] Selected asset:", asset.name);
+            }
             const dest = path.join(os.tmpdir(), asset.name);
             if (this.debug) {
                 this.sendDebugLog("[Updater:debug] Downloading asset:", asset.url);
