@@ -122,6 +122,6 @@ interface Logger {
 
 ## Security
 - All downloads use HTTPS.
-- SHA256/GPG validation is optional and metadata-dependent; GitHub's `digest` field is not currently mapped, so it is often inactive.
-- Code signing is planned, not implemented.
+- SHA256/GPG validation is optional and metadata-dependent; GitHub's `digest` field is not currently mapped, so it is normally inactive.
+- Code signing and publisher verification are not implemented.
 - These checks do not establish publisher identity (no pinned key) and occur after download.

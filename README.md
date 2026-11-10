@@ -1,11 +1,11 @@
 # basic-electron-updater
 
-A secure, cross-platform auto-update library for Electron Forge apps using GitHub Releases.
+A cross-platform auto-update library for Electron Forge apps using GitHub Releases.
 
 ## Features
 
 -   **Cross-platform:** Windows, macOS, Linux
--   **HTTPS-only downloads** with optional SHA256/GPG checks when release metadata supplies compatible fields; code signing is planned, not implemented
+-   **HTTPS-only downloads** with optional SHA256/GPG checks when release metadata supplies compatible fields; code signing and publisher verification are not implemented
 -   **Event-based API:** update-available, download-progress, downloaded, error
 -   **Cancellation and timeouts:** optional `AbortSignal` and `timeoutMs` on checks and downloads
 -   **Manual & automatic update checking**
@@ -133,9 +133,9 @@ non-cancellable behavior.
 ## Security
 
 -   All downloads use HTTPS.
--   SHA256 and GPG checks are optional and depend on release metadata exposing compatible fields. GitHub's `digest` field is not mapped by the current provider, so these checks are often inactive.
--   Code signing is planned, not implemented.
--   These checks are integrity aids, not publisher-authenticity guarantees: no publisher key is pinned, and the downloaded file is written before validation.
+-   SHA256 and GPG checks are optional and depend on release metadata exposing compatible fields. GitHub's `digest` field is not mapped by the current provider, so these checks are normally inactive.
+-   Code signing and publisher verification are not implemented.
+-   Asset selection and these checks are integrity aids, not publisher-authenticity guarantees: no publisher key is pinned, and the downloaded file is written before validation.
 
 ## Example: Electron Forge Integration
 
@@ -143,7 +143,10 @@ non-cancellable behavior.
 
     ```ts
     import Updater from "basic-electron-updater";
-    const updater = new Updater({ repo: "your/repo" });
+    const updater = new Updater({
+        repo: "your/repo",
+        assetPolicy: { product: "YourProduct" },
+    });
     updater.on("update-available", (info) => {
         /* ... */
     });

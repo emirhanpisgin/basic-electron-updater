@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> Historical entries may describe behavior that has changed or was documented
+> but not implemented. Current security limitations are documented in
+> [README.md](README.md); code signing is not implemented in the current package.
+
+## [1.1.0] - 2026-11-10
+
+### Added
+- Optional `AbortSignal` and `timeoutMs` on `checkForUpdates()` and `downloadUpdate()`; exported `UpdateOptions` with `AbortError` and `TimeoutError` behavior.
+- `assetPolicy` contract for product, platform and architecture, with exported `AssetSelectionError`. Ambiguous, mixed and zero-match releases fail closed before download.
+- Exact Windows legacy `<product>.Setup.exe` fallback for releases without an architecture-specific asset; `legacyAssetName: null` disables it.
+
+### Fixed
+- Download streams use `stream.pipeline`, remove partial files on failure or abort, and settle once.
+- Aborted or timed-out downloads never emit `downloaded` or retain a downloaded path.
+- Automatic downloads no longer create an unhandled rejection.
+
+### Security
+- No publisher signature, code-signing verification or pinned-key authentication is implemented. SHA256/GPG checks remain optional and metadata-dependent; GitHub's `digest` field is not mapped. Asset selection is not publisher authentication.
+
 ## [1.0.6] - 2025-07-08
 
 ### Fixed
@@ -99,7 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional GPG signature validation
 - Code signing verification on supported platforms
 
-## [Unreleased]
+## [0.1.0] — initial development
 
 ### Added
 - Initial release of basic-electron-updater
