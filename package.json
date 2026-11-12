@@ -25,6 +25,9 @@
     "clean": "rimraf dist",
     "lint": "eslint src/**/*.ts"
   },
+  "allowScripts": {
+    "electron": true
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/emirhanpisgin/basic-electron-updater.git"
