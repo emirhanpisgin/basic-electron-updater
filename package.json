@@ -19,7 +19,7 @@
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
-    "test": "mocha --require ts-node/register test/**/*.test.ts",
+    "test": "mocha --require ts-node/register --require ./test/setup.cjs test/**/*.test.ts",
     "test:watch": "npm test -- --watch",
     "dev": "tsc --watch",
     "clean": "rimraf dist",
