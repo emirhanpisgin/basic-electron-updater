@@ -146,6 +146,14 @@ describe("release asset selection", () => {
         assert.match(error.message, /arm64\.exe/);
     });
 
+    it("rejects unsafe asset names instead of resolving them outside staging", () => {
+        const error = expectSelectionError(
+            () => select(["Melodify-1.0.7-win32-x64/../../evil.exe"]),
+            "NO_MATCH"
+        );
+        assert.match(error.message, /unsafe asset name/);
+    });
+
     it("fails when no asset matches", () => {
         const error = expectSelectionError(
             () =>

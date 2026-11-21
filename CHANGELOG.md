@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > but not implemented. Current security limitations are documented in
 > [README.md](README.md); code signing is not implemented in the current package.
 
+## [Unreleased]
+
+## [2.0.0] - 2026-11-21
+
+### Added
+- Ed25519-signed update manifests with application-pinned keys, exact-byte signature verification, app/version/channel/platform/architecture binding and expiry.
+- Mandatory signed SHA-256/size verification, private staging directories, safe basenames, host/redirect/size/timeout download controls and pre-launch re-verification.
+- `SECURITY.md`, `SECURITY_AUDIT.md`, `docs/THREAT_MODEL.md`, `docs/SIGNING.md` and `docs/MIGRATION.md`.
+
+### Changed
+- **Breaking:** `new Updater({ repo })` now requires `security.publicKeys`; secure mode is the default. Existing unsigned callers must follow the migration guide or explicitly opt into the legacy mode.
+- Electron is a peer/dev dependency instead of a runtime dependency; the only production dependency is `semver`.
+- The published package includes the security documentation and no source, tests or keys.
+
+### Security
+- Added explicit fail-closed security configuration and legacy unsigned opt-in with a prominent warning.
+- Re-check semantic-version and manifest-expiry guards before download and again at the final launch step.
+- Added production-dependency audit checks to CI and publish workflows.
+
 ## [1.1.0] - 2026-11-10
 
 ### Added

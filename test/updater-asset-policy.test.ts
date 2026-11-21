@@ -2,6 +2,7 @@ import { describe, it } from "mocha";
 import * as assert from "assert";
 import Updater from "../src/index";
 import { AssetSelectionError } from "../src/assets/selectAsset";
+import { UpdateSecurityError } from "../src/security/errors";
 import type { DownloadProgress } from "../src/download/Downloader";
 import type { UpdateInfo, UpdateOptions } from "../src/types";
 
@@ -40,6 +41,11 @@ function createUpdater(assets: string[]): {
     const updater = new Updater({
         repo: "MelodifyApp/melodify",
         autoDownload: false,
+        security: {
+            allowUnsignedUpdates: true,
+            requireManifestSignature: false,
+            requireSha256: false,
+        },
         logger: {
             info: () => undefined,
             warn: () => undefined,
@@ -119,6 +125,22 @@ describe("Updater asset policy wiring", () => {
             (error: unknown) =>
                 error instanceof AssetSelectionError &&
                 error.code === "NO_MATCH"
+        );
+        assert.deepEqual(calls, []);
+    });
+
+    it("refuses a direct legacy download of an older or equal release", async () => {
+        const { updater, calls } = createUpdater([
+            "Melodify-1.0.7-win32-x64.exe",
+        ]);
+        (updater as unknown as { currentVersion: string }).currentVersion = "1.0.7";
+
+        assert.equal(await updater.checkForUpdates(), null);
+        await assert.rejects(
+            updater.downloadUpdate(),
+            (error: unknown) =>
+                error instanceof UpdateSecurityError &&
+                error.code === "DOWNGRADE"
         );
         assert.deepEqual(calls, []);
     });

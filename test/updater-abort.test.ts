@@ -71,6 +71,11 @@ function createUpdater(
             product: "Melodify",
             legacyAssetName: "Melodify Setup.exe",
         },
+        security: {
+            allowUnsignedUpdates: true,
+            requireManifestSignature: false,
+            requireSha256: false,
+        },
         logger: {
             info: () => undefined,
             warn: () => undefined,

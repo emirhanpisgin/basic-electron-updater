@@ -1,4 +1,5 @@
 import type { AssetArch, AssetPlatform, AssetPolicy } from "../types";
+import { isSafeAssetName } from "../utils/paths";
 
 export type AssetSelectionErrorCode =
     | "INVALID_POLICY"
@@ -102,6 +103,18 @@ function matchExtension(
 ): string | undefined {
     const lower = name.toLowerCase();
     return extensions.find((extension) => lower.endsWith(extension));
+}
+
+/** True when `name` has a supported installer extension for `platform`. */
+export function isSupportedInstallerName(
+    name: string,
+    platform: string
+): boolean {
+    return (
+        isAssetPlatform(platform) &&
+        isSafeAssetName(name) &&
+        !!matchExtension(name, SORTED_EXTENSIONS[platform])
+    );
 }
 
 function platformForExtension(name: string): AssetPlatform | undefined {
@@ -297,6 +310,10 @@ export function selectReleaseAsset<T extends { name: string }>(
 
     for (const asset of assets) {
         const name = asset.name;
+        if (!isSafeAssetName(name)) {
+            rejected.push(`${name} (unsafe asset name)`);
+            continue;
+        }
         const hostExtension = matchExtension(
             name,
             SORTED_EXTENSIONS[platform]

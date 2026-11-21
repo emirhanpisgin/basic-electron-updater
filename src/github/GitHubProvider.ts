@@ -5,6 +5,7 @@ import {
     GitHubReleaseResult,
 } from "./types";
 import type { UpdateOptions } from "../types";
+import * as semver from "semver";
 import {
     abortErrorFromSignal,
     createAbortContext,
@@ -12,6 +13,12 @@ import {
 } from "../utils/abort";
 
 export type { FetchLike } from "./types";
+
+function parseGithubDigest(digest: string | null | undefined): string | undefined {
+    if (typeof digest !== "string") return undefined;
+    const match = /^sha256:([0-9a-f]{64})$/i.exec(digest);
+    return match ? match[1].toLowerCase() : undefined;
+}
 
 /**
  * GitHubProvider fetches release data from the GitHub API for the configured repo.
@@ -119,7 +126,16 @@ export class GitHubProvider {
                     (this.channel === "latest" || r.tag_name.includes(this.channel))
             );
             if (!filtered.length) return null;
-            const release = filtered[0];
+            const release = [...filtered].sort((left, right) => {
+                const leftVersion = semver.valid(left.tag_name);
+                const rightVersion = semver.valid(right.tag_name);
+                if (leftVersion && rightVersion) {
+                    return semver.rcompare(leftVersion, rightVersion);
+                }
+                if (leftVersion) return -1;
+                if (rightVersion) return 1;
+                return 0;
+            })[0];
             return {
                 version: release.tag_name,
                 releaseName: release.name,
@@ -127,8 +143,8 @@ export class GitHubProvider {
                 assets: release.assets.map((a) => ({
                     name: a.name,
                     url: a.browser_download_url,
-                    sha256: a.sha256,
-                    gpgSignatureUrl: a.gpgSignatureUrl,
+                    size: a.size,
+                    sha256: parseGithubDigest(a.digest),
                 })),
             };
         } catch (error) {

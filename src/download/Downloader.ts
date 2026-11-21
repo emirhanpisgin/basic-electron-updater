@@ -9,8 +9,16 @@ import type { UpdateOptions } from "../types";
 import {
     abortErrorFromSignal,
     createAbortContext,
+    createTimeoutError,
     toError,
 } from "../utils/abort";
+import {
+    DownloadPolicy,
+    validateDownloadUrl,
+} from "./urlPolicy";
+import { UpdateSecurityError } from "../security/errors";
+
+export type { DownloadPolicy } from "./urlPolicy";
 
 export interface DownloadProgress {
     percent: number;
@@ -20,12 +28,14 @@ export interface DownloadProgress {
 
 export interface DownloadRequestOptions {
     signal?: AbortSignal;
+    timeoutMs?: number;
 }
 
 export interface DownloadRequestHandle {
     on(event: "error", listener: (error: Error) => void): this;
     on(event: "close", listener: () => void): this;
     destroy(error?: Error): this;
+    setTimeout?(timeoutMs: number, callback: () => void): this;
 }
 
 /**
@@ -91,7 +101,8 @@ export class Downloader {
         destPath: string,
         onProgress?: (progress: DownloadProgress) => void,
         expectedSha256?: string,
-        options?: UpdateOptions
+        options?: UpdateOptions,
+        policy?: DownloadPolicy
     ): Promise<string> {
         const context = createAbortContext(options);
         const state = { touched: false };
@@ -102,7 +113,8 @@ export class Downloader {
                 onProgress,
                 expectedSha256,
                 context.signal,
-                state
+                state,
+                policy
             );
             if (context.signal?.aborted) {
                 throw abortErrorFromSignal(context.signal);
@@ -190,20 +202,20 @@ export class Downloader {
         onProgress: ((progress: DownloadProgress) => void) | undefined,
         expectedSha256: string | undefined,
         signal: AbortSignal | undefined,
-        state: { touched: boolean }
+        state: { touched: boolean },
+        policy: DownloadPolicy | undefined
     ): Promise<void> {
-        const parsed = new URL(assetUrl);
-        if (parsed.protocol !== "https:") {
-            throw new Error("Only https downloads are supported");
-        }
-
-        let currentUrl = parsed.toString();
+        let currentUrl: string = validateDownloadUrl(assetUrl, policy).toString();
         let redirects = 0;
 
         for (;;) {
             if (signal?.aborted) throw abortErrorFromSignal(signal);
 
-            const { response, request } = await this.requestResponse(currentUrl, signal);
+            const { response, request } = await this.requestResponse(
+                currentUrl,
+                signal,
+                policy
+            );
             const status = response.statusCode ?? 0;
             const location = headerValue(response.headers.location);
 
@@ -213,12 +225,7 @@ export class Downloader {
                 if (!location) {
                     throw new Error("Redirect without location header");
                 }
-                const next = new URL(location, currentUrl);
-                if (next.protocol !== "https:") {
-                    throw new Error(
-                        `Refusing insecure redirect to ${next.protocol}`
-                    );
-                }
+                const next = validateDownloadUrl(location, policy, currentUrl);
                 redirects += 1;
                 if (redirects > MAX_REDIRECTS) {
                     throw new Error("Too many redirects");
@@ -240,7 +247,8 @@ export class Downloader {
                 onProgress,
                 expectedSha256,
                 signal,
-                state
+                state,
+                policy
             );
             return;
         }
@@ -253,7 +261,8 @@ export class Downloader {
      */
     private requestResponse(
         url: string,
-        signal: AbortSignal | undefined
+        signal: AbortSignal | undefined,
+        policy: DownloadPolicy | undefined
     ): Promise<{
         response: http.IncomingMessage;
         request: DownloadRequestHandle;
@@ -322,6 +331,14 @@ export class Downloader {
                 }
             });
 
+            if (policy?.requestTimeoutMs && request.setTimeout) {
+                request.setTimeout(policy.requestTimeoutMs, () => {
+                    const timeout = createTimeoutError(policy.requestTimeoutMs!);
+                    request?.destroy(timeout);
+                    finish(() => reject(timeout));
+                });
+            }
+
             if (signal) {
                 signal.addEventListener("abort", onAbort, { once: true });
                 if (signal.aborted) onAbort();
@@ -336,8 +353,22 @@ export class Downloader {
         onProgress: ((progress: DownloadProgress) => void) | undefined,
         expectedSha256: string | undefined,
         signal: AbortSignal | undefined,
-        state: { touched: boolean }
+        state: { touched: boolean },
+        policy: DownloadPolicy | undefined
     ): Promise<void> {
+        const maxBytes = policy?.maxBytes;
+        const declaredLength = parseContentLength(
+            response.headers["content-length"]
+        );
+        if (maxBytes !== undefined && declaredLength > maxBytes) {
+            response.on("error", () => undefined);
+            response.destroy();
+            throw new UpdateSecurityError(
+                "SIZE_MISMATCH",
+                `Download exceeds the configured maximum size of ${maxBytes} bytes`
+            );
+        }
+
         // A stale file from an earlier attempt must never be mistaken for this
         // attempt's bytes; exclusive creation catches concurrent writers.
         await fs.promises.rm(destPath, { force: true });
@@ -352,8 +383,22 @@ export class Downloader {
         signal?.addEventListener("abort", onAbort, { once: true });
         if (signal?.aborted) onAbort();
 
+        if (policy?.requestTimeoutMs && typeof response.setTimeout === "function") {
+            response.setTimeout(policy.requestTimeoutMs, () => {
+                response.destroy(createTimeoutError(policy.requestTimeoutMs!));
+            });
+        }
         const onData = (chunk: Buffer): void => {
             transferred += chunk.length;
+            if (maxBytes !== undefined && transferred > maxBytes) {
+                response.destroy(
+                    new UpdateSecurityError(
+                        "SIZE_MISMATCH",
+                        `Download exceeds the configured maximum size of ${maxBytes} bytes`
+                    )
+                );
+                return;
+            }
             if (onProgress && total > 0) {
                 try {
                     onProgress({
@@ -388,6 +433,12 @@ export class Downloader {
         if (total > 0 && transferred !== total) {
             throw new Error(
                 `Incomplete download: expected ${total} bytes, received ${transferred}`
+            );
+        }
+        if (maxBytes !== undefined && transferred > maxBytes) {
+            throw new UpdateSecurityError(
+                "SIZE_MISMATCH",
+                `Download exceeds the configured maximum size of ${maxBytes} bytes`
             );
         }
         if (expectedSha256) {

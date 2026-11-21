@@ -4,7 +4,11 @@ export interface GitHubReleaseAsset {
     name: string;
     browser_download_url: string;
     size: number;
+    /** GitHub's optional `sha256:<hex>` asset digest. */
+    digest?: string | null;
+    /** Deprecated/non-GitHub field kept for source compatibility. */
     sha256?: string;
+    /** Deprecated/non-GitHub field kept for source compatibility. */
     gpgSignatureUrl?: string;
 }
 

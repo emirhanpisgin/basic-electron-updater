@@ -7,15 +7,26 @@ describe('Updater', () => {
     describe('constructor', () => {
         it('should create an instance with valid config', () => {
             const config: UpdaterConfig = {
-                repo: 'test/repo'
+                repo: 'test/repo',
+                security: {
+                    allowUnsignedUpdates: true,
+                    requireManifestSignature: false,
+                    requireSha256: false
+                }
             };
             
             const updater = new Updater(config);
             assert.ok(updater instanceof Updater);
         });
 
-        it('should throw error with invalid repo format', () => {
-            const config: UpdaterConfig = {
+        it('requires pinned keys by default', () => {
+            assert.throws(
+                () => new Updater({ repo: 'test/repo' }),
+                /publicKeys is required/
+            );
+        });
+
+        it('should throw error with invalid repo format', () => {            const config: UpdaterConfig = {
                 repo: 'invalid-repo-format'
             };
             
@@ -28,7 +39,12 @@ describe('Updater', () => {
     describe('configuration', () => {
         it('should use default values for optional config', () => {
             const config: UpdaterConfig = {
-                repo: 'test/repo'
+                repo: 'test/repo',
+                security: {
+                    allowUnsignedUpdates: true,
+                    requireManifestSignature: false,
+                    requireSha256: false
+                }
             };
             
             const updater = new Updater(config);
@@ -39,6 +55,11 @@ describe('Updater', () => {
         it('should accept custom configuration', () => {
             const config: UpdaterConfig = {
                 repo: 'test/repo',
+                security: {
+                    allowUnsignedUpdates: true,
+                    requireManifestSignature: false,
+                    requireSha256: false
+                },
                 autoDownload: false,
                 allowPrerelease: true,
                 channel: 'beta',
@@ -53,7 +74,12 @@ describe('Updater', () => {
     describe('event handling', () => {
         it('should be able to register event listeners', () => {
             const config: UpdaterConfig = {
-                repo: 'test/repo'
+                repo: 'test/repo',
+                security: {
+                    allowUnsignedUpdates: true,
+                    requireManifestSignature: false,
+                    requireSha256: false
+                }
             };
             
             const updater = new Updater(config);

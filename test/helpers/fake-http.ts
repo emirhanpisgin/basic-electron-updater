@@ -12,6 +12,11 @@ export interface FakeResponse extends PassThrough {
 export class FakeClientRequest extends EventEmitter {
     destroyed = false;
 
+    setTimeout(timeoutMs: number, callback: () => void): this {
+        setTimeout(callback, timeoutMs);
+        return this;
+    }
+
     destroy(error?: Error): this {
         if (this.destroyed) return this;
         this.destroyed = true;

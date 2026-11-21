@@ -1,6 +1,6 @@
 {
   "name": "basic-electron-updater",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "A cross-platform auto-update library for Electron Forge apps using GitHub Releases.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,7 +14,9 @@
   "files": [
     "dist",
     "README.md",
-    "docs"
+    "docs",
+    "SECURITY.md",
+    "SECURITY_AUDIT.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -55,17 +57,20 @@
     "@types/semver": "^7.7.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
+    "electron": "^37.2.0",
     "eslint": "^8.57.0",
     "mocha": "^10.0.0",
     "rimraf": "^5.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.0.0"
   },
+  "peerDependencies": {
+    "electron": ">=27"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "electron": "^37.2.0",
     "semver": "^7.7.2"
   }
 }
